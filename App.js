@@ -30,7 +30,7 @@ function handleResponse(res) {
 function getTemp() {
   let temp;
   try {
-      temp = Shelly.getComponentStatus('Temperature', 100).tC;  //Temp ID, mostly 100 to 102 <- default values
+      temp = Shelly.getComponentStatus('Temperature', 100).tC;  //Temp ID, mostly 100 to 102
       print(temp);
   } catch(error) { print(error); temp = "error"; }
   return temp;
