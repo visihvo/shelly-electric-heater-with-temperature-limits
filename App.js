@@ -26,11 +26,11 @@ function handleResponse(res) {
       fetched = true;
       break;
     // If unexpected responses, assume price is not OK
-    case 404:
+    case 404: // TODO : in case of multiple 404 add cooldown or skip for a while and for safety measures turn off
       print("404: Could not load price information.");
       priceOk = false;
       break;
-    case 429:
+    case 429: // TODO : in case of multiple spam 429 add cooldown
       print("429: Too many requests from this IP address. Slow down.");
       priceOk = false;
       break;
@@ -114,6 +114,7 @@ Timer.set(30000, true, function () {
         let hour = res.sys.time.slice(0, 2); // f.ex. "21:34"
         if (cHour !== hour) { cHour = hour; fetched = false; }
         if (fetched === true) { return; }
+
         Shelly.call("HTTP.GET", { url: urlToCall, timeout: 15, ssl_ca: "*" }, handleResponse);
 
         if (res["switch:0"] && typeof res["switch:0"].output === "boolean") {
