@@ -80,11 +80,36 @@ function handleWarming() {
  * "Main function"
  */
 Timer.set(30000, true, function () {
-  Shelly.call("Shelly.GetStatus", "", function (res) {
-    let hour = res.sys.time.slice(0, 2); // f.ex. "21:34"
-    if (cHour !== hour) { cHour = hour; fetched = false; }
-    if (fetched === true) { print("The price for this hour is already fetched."); return; }
-    Shelly.call("HTTP.GET", { url: urlToCall, timeout: 15, ssl_ca: "*" }, handleResponse);
-  });
-  handleWarming();  
+  try { // Emergency shutdown incase an error happens during status fetch
+    Shelly.call("Shelly.GetStatus", "", function (res, err) {
+      if (err) {
+        print("Error fetching Shelly status: " + JSON.stringify(err));
+        manageWarming("stop");
+        return;
+      }
+      
+      try {
+        let hour = res.sys.time.slice(0, 2); // f.ex. "21:34"
+        if (cHour !== hour) { cHour = hour; fetched = false; }
+        if (fetched === true) { return; }
+        Shelly.call("HTTP.GET", { url: urlToCall, timeout: 15, ssl_ca: "*" }, handleResponse);
+
+        if (res["switch:0"] && typeof res["switch:0"].output === "boolean") {
+          rclosed = !res["switch:0"].output;
+        } else {
+          print("Relay status missing or invalid, assuming OFF.");
+          manageWarming("stop");
+          return;
+        }    
+      } catch (innerErr) {
+        print("Error processing Shelly status response (inner error):", innerErr);
+        manageWarming("stop");
+        return;
+      }
+      
+      handleWarming();
+    });
+  } catch (outerErr) {
+    print("Error (outer error):", outerErr);
+  }
 });
