@@ -2,7 +2,7 @@
 let PriceAllowed = "9"; // Set the maximum electricity price at which you want the device to be on (cents)
 let minTemp = 22.1; // Minimum temperature
 let maxTemp = 22.5; // Maximum temperature
-// =========================== SCRIPT, DO NOT EDIT LINES OR VALUES BELOW =============================
+
 //last known h,    hourly price fetched,   temperature rising,     relay closed,      price below limit
 let cHour = ""   ;   let fetched = false; let rising = false   ; let rclosed = true; let priceOk = false; 
 let urlToCall = "https://api.spot-hinta.fi/JustNowRank/0/" + PriceAllowed;
@@ -14,12 +14,34 @@ let urlToCall = "https://api.spot-hinta.fi/JustNowRank/0/" + PriceAllowed;
  * global variables fetch resulting in being called again later
  */
 function handleResponse(res) {
-  // If status code is 200, the price is OK
-  if (res.code === 200) { priceOk = true; fetched = true; return; }
-  // If status code is 400, the price is too high
-  if (res.code === 400) { priceOk = false; fetched = true; return; }
-  // If unexpected response, assume price is not OK
-  priceOk = false;
+  priceOk = false; // default
+
+  switch (res.code) {
+    case 200: // If status code is 200, the price is OK
+      priceOk = true;
+      fetched = true;
+      break;
+    case 400: // If status code is 400, the price is too high
+      priceOk = false;
+      fetched = true;
+      break;
+    // If unexpected responses, assume price is not OK
+    case 404:
+      print("404: Could not load price information.");
+      priceOk = false;
+      break;
+    case 429:
+      print("429: Too many requests from this IP address. Slow down.");
+      priceOk = false;
+      break;
+    case 500:
+      print("500: Fatal error. Error report has been sent.");
+      priceOk = false;
+      break;
+    default:
+      print("Unhandled response code", res.code);
+      priceOk = false; 
+  }
 }
 
 /**
