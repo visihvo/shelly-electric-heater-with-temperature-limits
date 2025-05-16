@@ -21,8 +21,7 @@ function scriptStatus() {
   }
 };
 
-
-function printStatus() {
+function printScriptStatus() {
   let status = "Status report:";
   const statusObj = scriptStatus();
   for (let key in statusObj ) {
@@ -153,7 +152,7 @@ function run() {
 function mainloop() {
   Timer.set(10000, true, function () {
     getTemp();
-    printStatus();
+    printScriptStatus();
   });
 }
 
