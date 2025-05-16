@@ -4,27 +4,34 @@ let minTemp = 22.1; // Minimum temperature
 let maxTemp = 22.5; // Maximum temperature
 
 //last known h,    hourly price fetched,   temperature rising,     relay on,      price below limit
-let cHour = ""   ;   let fetched = false; let rising = false   ; let relon= false; let priceOk = false; 
+let cHour = ""   ;   let fetched = false; let rising = false   ; let relon= false; let priceOk = false; let curTemp = 0;
 let urlToCall = "https://api.spot-hinta.fi/JustNowRank/0/" + PriceAllowed;
 
-let scriptStatus = {
-  allowed_price: PriceAllowed,
-  minimum_temperature: minTemp,
-  maximum_temperature: maxTemp,
-  current_fetched_hour: cHour,
-  price_fetched: fetched,
-  temperature_rising: rising,
-  relay_on: relon,
-  price_below_limit: priceOk,
-
-  print() {
-    const props = Object.entries(this)
-      .filter(([_, value]) => typeof value !== 'function')
-      .map(([key, value]) => `${key}: ${value}`)
-      .join(", ");
-    this.print(`Status report: ${props}`);
+function scriptStatus() {
+  return {
+    allowed_price: PriceAllowed,
+    minimum_temperature: minTemp,
+    maximum_temperature: maxTemp,
+    current_temperature: curTemp,
+    current_fetched_hour: cHour,
+    price_fetched: fetched,
+    temperature_rising: rising,
+    relay_on: relon,
+    price_below_limit: priceOk
   }
 };
+
+
+function printStatus() {
+  let status = "Status report:";
+  const statusObj = scriptStatus();
+  for (let key in statusObj ) {
+     status += " " + key + ": " + statusObj [key] + ",";
+  }
+  status = status.slice(0, -1);
+  
+  print(status);
+}
 
 /**
  * If-statements and their assignments prevent future needs to fetch price status again
@@ -34,6 +41,8 @@ let scriptStatus = {
  */
 function handleResponse(res) {
   priceOk = false; // default
+  
+  print("handling response");
 
   switch (res.code) {
     case 200: // If status code is 200, the price is OK
@@ -72,8 +81,11 @@ function getTemp() {
   let temp;
   try {
       temp = Shelly.getComponentStatus('Temperature', 100).tC;  //Temp ID, mostly 100 to 102
-      print(temp);
+      print("Temperature from sensor:", temp);
   } catch(error) { print(error); temp = "error"; }
+  
+  if (typeof temp === "number") { curTemp = temp; print("curTemp: ", curTemp); }
+  
   return temp;
 }
 
@@ -108,41 +120,44 @@ function handleWarming() {
   let temp = getTemp();
   
   // invalid fetch for temperature
-  if (typeof temp !== "number") { manageWarming("stop"); } 
+  if (typeof temp !== "number") { manageWarming("stop"); return; } 
   
   // temperature has risen below the set limit  
   if (temp > maxTemp && rising) { manageWarming("stop"); }
+  
+  // safety measure
+  if (temp > maxTemp + 0.4) { manageWarming("stop"); }
 
   //temperate has gone below the set limit
   else if (minTemp > temp && !rising) { rising = true; manageWarming("start"); }
 }
 
-/**
- * TODO
- * 
 function run() {
+  print("Script started");
+  // Beginning state inits 
 
+  // Relay state verification
 
-  Init script status object and print it
-  ^ Make sure relay is closed when script starts or reloads
+  // Price verification
 
-  Add price fetch and an additional timer if unable to fetch 
-  after a few tries.
-  
+  // Temperature verification
+
   mainloop()
 
 }
 
+/**
+ * TODO
+ * "Main function"
+ * */
 function mainloop() {
-  Move timer block here
+  Timer.set(10000, true, function () {
+    getTemp();
+    printStatus();
+  });
 }
 
-*/
-
-/**
- * "Main function"
- */
-Timer.set(10000, true, function () {
+function updateStateAndPrice() {
   try { // Emergency shutdown incase an error happens during status fetch
     Shelly.call("Shelly.GetStatus", "", function (res, err) {
       if (err) {
@@ -176,4 +191,4 @@ Timer.set(10000, true, function () {
   } catch (outerErr) {
     print("Error (outer error):", outerErr);
   }
-});
+}
