@@ -3,8 +3,8 @@ let PriceAllowed = "9"; // Set the maximum electricity price at which you want t
 let minTemp = 22.1; // Minimum temperature
 let maxTemp = 22.5; // Maximum temperature
 
-//last known h,    hourly price fetched,   temperature rising,     relay closed,      price below limit
-let cHour = ""   ;   let fetched = false; let rising = false   ; let rclosed = true; let priceOk = false; 
+//last known h,    hourly price fetched,   temperature rising,     relay on,      price below limit
+let cHour = ""   ;   let fetched = false; let rising = false   ; let relon= false; let priceOk = false; 
 let urlToCall = "https://api.spot-hinta.fi/JustNowRank/0/" + PriceAllowed;
 
 let scriptStatus = {
@@ -14,7 +14,7 @@ let scriptStatus = {
   current_fetched_hour: cHour,
   price_fetched: fetched,
   temperature_rising: rising,
-  relay_on: !rclosed,
+  relay_on: relon,
   price_below_limit: priceOk,
 
   print() {
@@ -83,16 +83,16 @@ function getTemp() {
  */
 function manageWarming(status) {
   if (status === "stop") {
-    Shelly.call("Switch.Set", "{ id:0, on:false}", null, null); 
+    //Shelly.call("Switch.Set", "{ id:0, on:false}", null, null); 
     print("Relay OFF"); 
     rising = false; 
-    rclosed = true;
+    relon= false;
   }
   else {
-    Shelly.call("Switch.Set", "{ id:0, on:true}", null, null); 
+    //Shelly.call("Switch.Set", "{ id:0, on:true}", null, null); 
     print("Relay ON"); 
     rising = true;
-    rclosed = false;
+    relon= true;
   }
 }
 
@@ -101,7 +101,7 @@ function manageWarming(status) {
  */
 function handleWarming() {
   // cant fetch price or its too high and relay is on results in it closing
-  if (!priceOk && !rclosed) { manageWarming("stop"); }
+  if (!priceOk && relon) { manageWarming("stop"); }
   //price too high or invalid fetch but relay is already closed
   else if (!priceOk) { return; } 
   
@@ -159,7 +159,7 @@ Timer.set(10000, true, function () {
         Shelly.call("HTTP.GET", { url: urlToCall, timeout: 15, ssl_ca: "*" }, handleResponse);
 
         if (res["switch:0"] && typeof res["switch:0"].output === "boolean") {
-          rclosed = !res["switch:0"].output;
+          relon = res["switch:0"].output;
         } else {
           print("Relay status missing or invalid, assuming OFF.");
           manageWarming("stop");
