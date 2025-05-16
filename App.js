@@ -118,9 +118,31 @@ function handleWarming() {
 }
 
 /**
+ * TODO
+ * 
+function run() {
+
+
+  Init script status object and print it
+  ^ Make sure relay is closed when script starts or reloads
+
+  Add price fetch and an additional timer if unable to fetch 
+  after a few tries.
+  
+  mainloop()
+
+}
+
+function mainloop() {
+  Move timer block here
+}
+
+*/
+
+/**
  * "Main function"
  */
-Timer.set(30000, true, function () {
+Timer.set(10000, true, function () {
   try { // Emergency shutdown incase an error happens during status fetch
     Shelly.call("Shelly.GetStatus", "", function (res, err) {
       if (err) {
