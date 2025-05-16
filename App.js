@@ -7,6 +7,25 @@ let maxTemp = 22.5; // Maximum temperature
 let cHour = ""   ;   let fetched = false; let rising = false   ; let rclosed = true; let priceOk = false; 
 let urlToCall = "https://api.spot-hinta.fi/JustNowRank/0/" + PriceAllowed;
 
+let scriptStatus = {
+  allowed_price: PriceAllowed,
+  minimum_temperature: minTemp,
+  maximum_temperature: maxTemp,
+  current_fetched_hour: cHour,
+  price_fetched: fetched,
+  temperature_rising: rising,
+  relay_on: !rclosed,
+  price_below_limit: priceOk,
+
+  print() {
+    const props = Object.entries(this)
+      .filter(([_, value]) => typeof value !== 'function')
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(", ");
+    this.print(`Status report: ${props}`);
+  }
+};
+
 /**
  * If-statements and their assignments prevent future needs to fetch price status again
  * @param {JSON} res HTTP GET results of fetch 
