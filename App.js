@@ -7,6 +7,9 @@ let maxTemp = 22.5; // Maximum temperature
 let cHour = ""   ;   let fetched = false; let rising = false   ; let relon= false; let priceOk = false; let curTemp = 0;
 let urlToCall = "https://api.spot-hinta.fi/JustNowRank/0/" + PriceAllowed;
 
+/**
+ * Creates and returns an object which has all the attributes as its properties.
+ */
 function scriptStatus() {
   return {
     allowed_price: PriceAllowed,
@@ -21,6 +24,9 @@ function scriptStatus() {
   }
 };
 
+/**
+ * Prints names and values of the attributes.
+ */
 function printScriptStatus() {
   let status = "Status report:";
   const statusObj = scriptStatus();
@@ -33,6 +39,23 @@ function printScriptStatus() {
 }
 
 /**
+ * Sends HTTP GET REQUEST to the eletricity price site and calls response handling function.
+ */
+function checkPrice() {
+  Shelly.call("HTTP.GET", { url: urlToCall, timeout: 15, ssl_ca: "*" }, function (res, err) {
+    if (err) {
+      print("HTTP GET error:", JSON.stringify(err));
+      priceOk = false;
+      fetched = false;
+      return;
+    }
+
+    handleResponse(res);
+  });
+}
+
+
+/**
  * If-statements and their assignments prevent future needs to fetch price status again
  * @param {JSON} res HTTP GET results of fetch 
  * @returns price ok -> true, price too expensive -> false, invalid response -> doesnt assign
@@ -40,8 +63,6 @@ function printScriptStatus() {
  */
 function handleResponse(res) {
   priceOk = false; // default
-  
-  print("handling response");
 
   switch (res.code) {
     case 200: // If status code is 200, the price is OK
@@ -73,17 +94,17 @@ function handleResponse(res) {
 
 /**
  * Temperature fetch and its error handling.
- * @returns succesful fetch -> current temperature as a number, 
- * else returns "error"
+ * @returns succesful fetch -> current temperature as a number
  */
-function getTemp() {
+function getAndUpdateTemp() {
   let temp;
   try {
       temp = Shelly.getComponentStatus('Temperature', 100).tC;  //Temp ID, mostly 100 to 102
-      print("Temperature from sensor:", temp);
-  } catch(error) { print(error); temp = "error"; }
+      //print("Temperature from sensor:", temp);
+  } catch(error) { print(error); manageWarming("stop"); }
   
-  if (typeof temp === "number") { curTemp = temp; print("curTemp: ", curTemp); }
+  if (typeof temp === "number") { curTemp = temp; }
+  else { manageWarming("stop"); }
   
   return temp;
 }
@@ -111,52 +132,28 @@ function manageWarming(status) {
  * Responsible for handling proper calls for relay work.
  */
 function handleWarming() {
+  print("handling warming");
   // cant fetch price or its too high and relay is on results in it closing
-  if (!priceOk && relon) { manageWarming("stop"); }
-  //price too high or invalid fetch but relay is already closed
-  else if (!priceOk) { return; } 
+  if (!priceOk && relon) { manageWarming("stop"); print("1 if");}
+  //price too high or invalid fetch
+  else if (!priceOk) { return; print("2 if");} 
   
-  let temp = getTemp();
+  let temp = getAndUpdateTemp();
   
   // invalid fetch for temperature
-  if (typeof temp !== "number") { manageWarming("stop"); return; } 
+  if (typeof temp !== "number") { manageWarming("stop"); print("3 if"); return; } 
   
   // temperature has risen below the set limit  
-  if (temp > maxTemp && rising) { manageWarming("stop"); }
+  if (temp > maxTemp && rising) { manageWarming("stop"); print("4 if"); }
   
   // safety measure
-  if (temp > maxTemp + 0.4) { manageWarming("stop"); }
+  if (temp > maxTemp + 0.4) { manageWarming("stop"); print("5 if");}
 
   //temperate has gone below the set limit
-  else if (minTemp > temp && !rising) { rising = true; manageWarming("start"); }
+  else if (minTemp > temp && !rising) { rising = true; manageWarming("start"); print("6 if");}
 }
 
-function run() {
-  print("Script started");
-  // Beginning state inits 
-
-  // Relay state verification
-
-  // Price verification
-
-  // Temperature verification
-
-  mainloop()
-
-}
-
-/**
- * TODO
- * "Main function"
- * */
-function mainloop() {
-  Timer.set(10000, true, function () {
-    getTemp();
-    printScriptStatus();
-  });
-}
-
-function updateStateAndPrice() {
+function updateRelayStateAndTime() {
   try { // Emergency shutdown incase an error happens during status fetch
     Shelly.call("Shelly.GetStatus", "", function (res, err) {
       if (err) {
@@ -170,8 +167,6 @@ function updateStateAndPrice() {
         if (cHour !== hour) { cHour = hour; fetched = false; }
         if (fetched === true) { return; }
 
-        Shelly.call("HTTP.GET", { url: urlToCall, timeout: 15, ssl_ca: "*" }, handleResponse);
-
         if (res["switch:0"] && typeof res["switch:0"].output === "boolean") {
           relon = res["switch:0"].output;
         } else {
@@ -184,10 +179,47 @@ function updateStateAndPrice() {
         manageWarming("stop");
         return;
       }
-      
-      handleWarming();
     });
   } catch (outerErr) {
     print("Error (outer error):", outerErr);
   }
 }
+
+
+function run() {
+  // Beginning state inits 
+  print("Script started");
+  updateRelayStateAndTime();
+
+  // Price verification
+
+  // Temperature verification
+
+  mainloop()
+}
+
+/**
+ * TODO
+ * "Main function"
+ * */
+function mainloop() {
+  Timer.set(10000, true, function () {
+    checkPrice();
+    print("price checked");
+
+    if (!priceOk) {
+      updateRelayStateAndTime();
+      print("relon updated");
+      handleWarming();
+      print("warming handled");
+    }
+
+    getAndUpdateTemp();
+    printScriptStatus();
+    
+    handleWarming();
+    
+  });
+}
+
+run();
